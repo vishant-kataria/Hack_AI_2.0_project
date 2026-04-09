@@ -33,10 +33,10 @@ except Exception as _e:
     GEMINI_OK = False
 
 def _model(model_name: str = None) -> genai.GenerativeModel:
-    return genai.GenerativeModel(model_name or "gemini-2.5-flash-lite")
+    return genai.GenerativeModel(model_name or "gemini-1.5-flash")
 
 # Fallback model chain — if one is rate-limited, try the next
-_FALLBACK_MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
+_FALLBACK_MODELS = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
 
 def _generate(prompt, retries: int = 2, **kwargs):
     """Generate content with automatic model fallback and retry on rate limiting."""
