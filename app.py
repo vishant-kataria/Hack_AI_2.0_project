@@ -33,13 +33,14 @@ except Exception as _e:
     GEMINI_OK = False
 
 def _model(model_name: str = None) -> genai.GenerativeModel:
-    return genai.GenerativeModel(model_name or "gemini-1.5-flash")
+    return genai.GenerativeModel(model_name or "gemini-2.5-flash-lite")
 
 # Fallback model chain — if one is rate-limited, try the next
-_FALLBACK_MODELS = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
+_FALLBACK_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash"]
 
 def _generate(prompt, retries: int = 2, **kwargs):
     """Generate content with automatic model fallback and retry on rate limiting."""
+    last_err = None
     for model_name in _FALLBACK_MODELS:
         for attempt in range(retries + 1):
             try:
@@ -47,18 +48,24 @@ def _generate(prompt, retries: int = 2, **kwargs):
                 resp = model.generate_content(prompt, **kwargs)
                 return resp
             except Exception as e:
+                last_err = e
                 err = str(e)
+                # API key is dead — no point retrying any model
+                if "API_KEY_INVALID" in err or "expired" in err.lower() or "invalid" in err.lower():
+                    raise Exception("❌ API key is invalid or expired. Please generate a new key at https://aistudio.google.com/apikey and update .streamlit/secrets.toml") from e
+                # Rate limited — retry with backoff, then try next model
                 if "429" in err or "ResourceExhausted" in err or "quota" in err.lower():
                     if attempt < retries:
-                        time.sleep(3 * (attempt + 1))  # backoff
+                        time.sleep(3 * (attempt + 1))
                         continue
                     else:
                         break  # try next model
+                # Model doesn't exist — try next model
                 elif "404" in err:
-                    break  # model doesn't exist, try next
+                    break
                 else:
                     raise e
-    raise Exception("All AI models are currently rate-limited. Please wait a minute and try again.")
+    raise Exception(f"All AI models are currently rate-limited. Please wait a minute and try again. Last error: {last_err}")
 
 def _safe_json(text: str) -> dict | list | None:
     """Strip markdown fences and parse JSON safely."""
