@@ -1,6 +1,9 @@
 # Streamlit secrets (contains API keys)
 .streamlit/secrets.toml
 
+# Local SQLite database (cloud uses Neon PostgreSQL)
+careerforge.db
+
 # Python
 __pycache__/
 *.py[cod]

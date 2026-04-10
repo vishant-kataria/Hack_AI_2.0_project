@@ -13,11 +13,10 @@ import base64
 import google.generativeai as genai
 import PyPDF2
 
-try:
-    import database as db
-    DB_OK = True
-except Exception:
-    DB_OK = False
+import database as db
+
+# Database is always available (local SQLite)
+DB_OK = True
 
 # -----------------------------------------------------------------
 # PAGE CONFIG
@@ -1735,10 +1734,6 @@ def render_progress_tracking():
 
 
 # -----------------------------------------------------------------
-# MAIN
-# -----------------------------------------------------------------
-
-# -----------------------------------------------------------------
 # AUTH: NAVBAR, SIGN IN, SIGN UP
 # -----------------------------------------------------------------
 def render_authenticated_navbar():
@@ -1835,7 +1830,11 @@ def render_signin_page():
                 if not si_username or not si_password:
                     st.error("Please fill in all fields.")
                 else:
-                    user = db.authenticate_user(si_username.strip(), si_password)
+                    try:
+                        user = db.authenticate_user(si_username.strip(), si_password)
+                    except Exception as e:
+                        st.error(f"⚠️ Database error: {e}")
+                        user = None
                     if user:
                         st.session_state.authenticated = True
                         st.session_state.user_id = user["id"]
@@ -1884,7 +1883,7 @@ def render_signup_page():
             unsafe_allow_html=True,
         )
 
-        with st.form("signup_form", clear_on_submit=True):
+        with st.form("signup_form", clear_on_submit=False):
             su_fullname = st.text_input("Full Name", key="su_name", placeholder="Enter your full name")
             su_email = st.text_input("Email", key="su_email", placeholder="Enter your email")
             su_username = st.text_input("Username", key="su_user", placeholder="Choose a username")
@@ -1896,27 +1895,38 @@ def render_signup_page():
                     st.error("Please fill in all fields.")
                 elif len(su_password) < 4:
                     st.error("Password must be at least 4 characters.")
-                elif db.check_username_exists(su_username.strip()):
-                    st.error("Username already taken. Try another one.")
                 else:
-                    user_id = db.create_user(
-                        username=su_username.strip(),
-                        full_name=su_fullname.strip(),
-                        email=su_email.strip(),
-                        password=su_password,
-                    )
-                    if user_id:
-                        st.session_state.authenticated = True
-                        st.session_state.user_id = user_id
-                        st.session_state.username = su_username.strip()
-                        st.session_state.full_name = su_fullname.strip()
-                        st.session_state.show_page = "dashboard"
-                        load_user_data()
-                        st.success("Account created! Redirecting...")
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error("Username or email already exists.")
+                    try:
+                        username_taken = db.check_username_exists(su_username.strip())
+                    except Exception as e:
+                        st.error(f"⚠️ Database error: {e}")
+                        username_taken = None
+
+                    if username_taken:
+                        st.error("Username already taken. Try another one.")
+                    elif username_taken is not None:
+                        try:
+                            user_id = db.create_user(
+                                username=su_username.strip(),
+                                full_name=su_fullname.strip(),
+                                email=su_email.strip(),
+                                password=su_password,
+                            )
+                        except Exception as e:
+                            st.error(f"⚠️ Database error: {e}")
+                            user_id = None
+                        if user_id:
+                            st.session_state.authenticated = True
+                            st.session_state.user_id = user_id
+                            st.session_state.username = su_username.strip()
+                            st.session_state.full_name = su_fullname.strip()
+                            st.session_state.show_page = "dashboard"
+                            load_user_data()
+                            st.success("Account created! Redirecting...")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("Username or email already exists.")
 
         st.markdown("")
         col_a, col_b = st.columns(2)
@@ -3554,12 +3564,6 @@ function navigateTo(page) {
         'allow="scripts"></iframe>',
         unsafe_allow_html=True
     )
-
-
-# -----------------------------------------------------------------
-# MAIN
-# -----------------------------------------------------------------
-
 
 
 # -----------------------------------------------------------------
